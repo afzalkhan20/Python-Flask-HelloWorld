@@ -90,19 +90,33 @@ def categorize(description):
 @app.route("/", methods=['GET', 'POST'])
 def home():
     logging.info('Entry to home decorator')
-    return "Hello, this is a sample Python Web App running on Flask Framework!"
+    message = '''Hello, this is a sample Python Web App running on Flask Framework for Complaints Categorization !
+                 Link- "http://complaintstest.azurewebsites.net/categorize"
+                 Sample JSON input post request 
+                 {
+  "0": {
+    "Id": 10401,
+    "ComplaintDesciptionTranslatedEn": "Procrastination in the start of repairing the car and not providing an alternative car to the customer according to the new law as it is damaged and caused by its insurance on the new document "
+  },
+  "1": {
+    "Id": 10402,
+    "ComplaintDesciptionTranslatedEn": "I provided health insurance to my wife more than 20 days ago at The Guarantee Insurance Company and informed the insurance company after 3 days that the transaction was rejected but they withdrew the amount from my account and filed more than one complaint with them but without result please help me to recover the melg and thank you"
+  }
+               '''
+    return message
 
 @app.route('/categorize', methods=['GET', 'POST'])
 def add_message():
     logging.info('Entry to add_message decorator')
     try:
         content = request.get_json(silent=True)
+        if content is None:
+            return "Invalid Input"
         df_input = pd.DataFrame.from_dict(content, orient="index")
         df_input['Complaint'] = df_input['ComplaintDesciptionTranslatedEn']
         df_cat = preprocessing(df_input)
         df_cat["cat_pred"] = df_cat.ComplaintDesciptionTranslatedEn.apply(lambda x: categorize(x))
+        return df_cat[['Id', 'Complaint', 'cat_pred']].to_json(orient='index')
+    except :
+        return "Error in Processing Input. Check api json input format"
 
-    except Exception as exc:
-        return "Error in Processing"
-    finally:
-        return df_cat[['Id','Complaint','cat_pred']].to_json(orient='index')
