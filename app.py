@@ -9,6 +9,7 @@ import nltk
 nltk.download('stopwords')
 from nltk.corpus import stopwords
 import logging
+import pyodbc
 
 stop_words = stopwords.words('english')
 
@@ -73,6 +74,25 @@ def remove_stopwords(des):
     des_new = " ".join([i for i in des if i not in stop_words])
     return des_new
 
+def get_insurance_sub_type():
+    try:
+        conn = pyodbc.connect('Driver={SQL Server};'
+                              'Server=IASMARTWEBDB01\SMARTSERVICESDB;'
+                              'Database=eComplaints_Production;'
+                              'UID=ECReadOnly;'
+                              'PWD=ECReadOnly@2019;'
+                              )
+
+        cursor = conn.cursor()
+        df_Ins_Types = pd.read_sql_query('SELECT Id,TitleEn,TitleAr FROM eComplaints_Production.dbo.Def_InsruanceType', conn)
+        status = "success"
+        return df_Ins_Types,status
+    except:
+        df = pd.DataFrame(columns=['Id','TitleEn','TitleAr'])
+        status="failure"
+        return df, status
+
+
 def preprocessing(df_preprocess):
     logging.info('Entry to preprocessing')
     df_preprocess['ComplaintDesciptionTranslatedEn'] = df_preprocess['ComplaintDesciptionTranslatedEn'].str.lower()
@@ -135,14 +155,15 @@ def add_message():
     logging.info('Entry to add_message decorator')
     try:
         content = request.get_json(silent=True)
-
+        header = request.headers.get('key')
+        
         if content is None:
             empty_dict = {}
             empty_dict['data'] = []
             empty_dict['status'] = 'failure'
             empty_dict['message'] = "Input data is Empty/Incorrect. Please check the format"
             return json.dumps(empty_dict)
-        if content['key'] == "TESTKEY":
+        if header == "TESTKEY":
             pass
         else:
             invali_key_dict = {}
@@ -158,7 +179,18 @@ def add_message():
         df_input['Complaint'] = df_input['ComplaintDesciptionTranslatedEn']
         df_cat = preprocessing(df_input)
         df_cat["cat_pred"] = df_cat.ComplaintDesciptionTranslatedEn.apply(lambda x: categorize(x))
-        dic_out = json.loads(df_cat[['Complaint', 'cat_pred']].to_json(orient='table'))
+        print("1")
+        df_instype_db,status = get_insurance_sub_type()
+        print("1")
+        if df_instype_db.empty or status=="failure":
+            db_dict = {}
+            db_dict['data'] = []
+            db_dict['status'] = 'failure'
+            db_dict['message'] = "Error in Fetching Insurance Type from database. Check Input Database connection or data"
+            return json.dumps(db_dict)
+        df_cat = pd.merge(df_cat, df_instype_db, left_on='cat_pred',right_on='TitleEn',how='left')
+
+        dic_out = json.loads(df_cat[['Complaint', 'cat_pred','Id','TitleEn','TitleAr']].to_json(orient='table'))
 
 
         keys_return = ['data']
