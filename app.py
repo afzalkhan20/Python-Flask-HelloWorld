@@ -41,6 +41,30 @@ life_keywords = {"life","death"}
 life_kwrds_len = len(life_keywords)
 life_kwrds_direct = {"life insurance"}
 life_re = re.compile("|".join(life_kwrds_direct))
+
+marine_kwrds_direct = {"marine insurance"}
+marine_re = re.compile("|".join(marine_kwrds_direct))
+
+
+schema =  {
+                "fields": [
+                    {
+                        "name": "index",
+                        "type": "integer"
+                    },
+                    {
+                        "name": "ComplaintDesciptionTranslatedEn",
+                        "type": "string"
+                    }
+                ],
+                "primaryKey": [
+                    "index"
+                ]
+            }
+Failure = 404
+invalid = 403
+ok = 200
+
 #-----------------------------Configuration Ends---------------------#
 
 # function to remove stopwords
@@ -85,14 +109,15 @@ def categorize(description):
         return "Life Insurance"
     elif (property_cat_prob > 0) or property_re.search(description):
         return "Property Insurance"
+    elif marine_re.search(description):
+        return "Marine Insurance"
     else:
         return "Other"
 @app.route("/", methods=['GET', 'POST'])
 def home():
     logging.info('Entry to home decorator')
-    message = '''Hello, this is a sample Python Web App running on Flask Framework for Complaints Categorization !
-                 Link- "http://complaintstest.azurewebsites.net/categorize"
-                 Sample JSON input post request 
+    message = '''Hello, this is a sample Python Web App running on Flask Framework for Complaints Categorization !\n
+                 Sample JSON input post request \n 
                  {
   "0": {
     "Id": 10401,
@@ -110,13 +135,41 @@ def add_message():
     logging.info('Entry to add_message decorator')
     try:
         content = request.get_json(silent=True)
+
         if content is None:
-            return "Invalid Input"
-        df_input = pd.DataFrame.from_dict(content, orient="index")
+            empty_dict = {}
+            empty_dict['data'] = []
+            empty_dict['status'] = 'failure'
+            empty_dict['message'] = "Input data is Empty/Incorrect. Please check the format"
+            return json.dumps(empty_dict)
+        if content['key'] == "TESTKEY":
+            pass
+        else:
+            invali_key_dict = {}
+            invali_key_dict['data'] = []
+            invali_key_dict['status'] = 'failure'
+            invali_key_dict['message'] = "Invalid Key"
+            return json.dumps(invali_key_dict)
+
+        content['schema'] = schema
+        content = json.dumps(content)
+        df_input = pd.read_json(content,orient='table')
+
         df_input['Complaint'] = df_input['ComplaintDesciptionTranslatedEn']
         df_cat = preprocessing(df_input)
         df_cat["cat_pred"] = df_cat.ComplaintDesciptionTranslatedEn.apply(lambda x: categorize(x))
-        return df_cat[['Id', 'Complaint', 'cat_pred']].to_json(orient='index')
-    except :
-        return "Error in Processing Input. Check api json input format"
+        dic_out = json.loads(df_cat[['Complaint', 'cat_pred']].to_json(orient='table'))
 
+
+        keys_return = ['data']
+
+        dic_out = dict((k, dic_out[k]) for k in keys_return)
+        dic_out['status'] = 'success'
+        dic_out['message'] = 'Category prediction successful'
+        return json.dumps(dic_out)
+    except :
+        fail_dict = {}
+        fail_dict['data'] = []
+        fail_dict['status'] = 'failure'
+        fail_dict['message'] = "Error in Processing Input. Check Input json input format"
+        return json.dumps(fail_dict)
