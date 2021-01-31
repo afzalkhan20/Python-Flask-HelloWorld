@@ -160,9 +160,9 @@ def add_message():
         df_input['Complaint'] = df_input['ComplaintDesciptionTranslatedEn']
         df_cat = preprocessing(df_input)
         df_cat["cat_pred"] = df_cat.ComplaintDesciptionTranslatedEn.apply(lambda x: categorize(x))
-
+        df_cat.reset_index(inplace=True)
         df_cat = pd.merge(df_cat, df_instype_db, left_on='cat_pred',right_on='TitleEn',how='left')
-
+        df_cat.set_index('index', inplace=True)
         dic_out = json.loads(df_cat[['Complaint', 'cat_pred','Id','TitleEn','TitleAr']].to_json(orient='table'))
 
 
