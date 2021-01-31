@@ -91,7 +91,7 @@ def preprocessing(df_preprocess):
 
 
 def categorize(description):
-    logging.info('Entry to categorize function')
+    logging.info('Entry to categorize description function')
     des_kwrds = set(description.split(" "))
 
     vehicle_cat_prob = len(des_kwrds.intersection(vehicle_keywords)) / vehicle_kwrds_len
